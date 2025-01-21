@@ -1,0 +1,7 @@
+app:
+  name: 'Kyle-Redis'
+  version: '1.0.0'
+
+port:
+  server: 8080
+  redis: 6379
