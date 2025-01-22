@@ -29,7 +29,7 @@ func TestHandleClientConnection2(t *testing.T) {
 	}
 
 	// 1. Start the server by listening on a specific port.
-	listener, err := net.Listen("tcp", "localhost:"+port)
+	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		logger.Log.Fatalf("Error starting server: %+v", err)
 	}
@@ -55,12 +55,12 @@ func TestHandleClientConnection2(t *testing.T) {
 
 func simulateClientConnection2() {
 	// 1. Connect to the server.
-	conn, err := net.Dial("tcp", "localhost:"+viper.GetString("port.server"))
+	conn, err := net.Dial("tcp", ":"+viper.GetString("port.server"))
 	if err != nil {
 		logger.Log.Fatalf("Error connecting to server: %+v", err)
 	}
 	defer conn.Close()
-	logger.Log.Infoln("Connected to the server. Type commands (e.g., PING, HELLO, TIME, EXIT)")
+	logger.Log.Infoln("Connected to the server. Type commands (e.g. PING, HELLO, TIME, EXIT)")
 
 	for {
 		conn.Write([]byte("REAL-TIME" + "\n"))

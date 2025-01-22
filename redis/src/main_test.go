@@ -12,14 +12,12 @@ import (
 
 func exampleClientConnection() {
 	// 1. Connect to the server.
-	conn, err := net.Dial("tcp", "localhost:"+viper.GetString("port.server"))
+	conn, err := net.Dial("tcp", ":"+viper.GetString("port.server"))
 	if err != nil {
 		logger.Log.Fatalf("Error connecting to server: %+v", err)
 	}
 	defer conn.Close()
-	logger.Log.Infoln("Connected to the server. Type commands (e.g., PING, HELLO, TIME, EXIT)")
-
-	conn.Write([]byte("PING" + "\n"))
+	logger.Log.Infoln("Connected to the server. Type commands (e.g. PING, HELLO, TIME, EXIT)")
 
 	// 2. Read input from the user and send it to the server.
 	scanner := bufio.NewScanner(os.Stdin)

@@ -65,17 +65,21 @@ func RedisHandleConnection(conn net.Conn) {
 	// 4. Read client requests.
 	reader := bufio.NewReader(conn)
 	for {
-		message, err := reader.ReadString('\n')
+		msg, err := reader.ReadString('\n')
 		if err != nil {
 			logger.Log.Errorf("Connection closed: %+v", err)
 			return
 		}
-		message = strings.TrimSpace(message) // Remove newline characters
-		logger.Log.Infof("Command received: %s\n", message)
+		command, message, err := parseMessage(msg) // Remove newline characters
+		if err != nil {
+			logger.Log.Errorf("Connection closed: %+v", err)
+			return
+		}
+		logger.Log.Infof("Command received: %s, %s\n", command, message)
 
 		// 5. Process commands based on client input.
 		var response string
-		switch message {
+		switch command {
 		case "PING":
 			response = "PONG\n"
 		case "HELLO":
@@ -84,8 +88,8 @@ func RedisHandleConnection(conn net.Conn) {
 			response = fmt.Sprintf("Current time: %s\n", time.Now().Format("15:04:05"))
 		case "EXIT":
 			response = "Goodbye!\n"
-		case "REAL-TIME":
-			err := manager.AddUser(ctx, conn.RemoteAddr().String())
+		case "ADDUSER":
+			err := manager.AddUser(ctx, message)
 			if err != nil {
 				logger.Log.Errorf("Error sending response: %v", err)
 				response = fmt.Sprintf("%v\n", err)
@@ -95,6 +99,9 @@ func RedisHandleConnection(conn net.Conn) {
 					return
 				}
 			}
+			response = fmt.Sprintf("%s\n", conn.RemoteAddr().String())
+			logger.Log.Infof("Successfully Update User Aliving: %s\n", conn.RemoteAddr().String())
+		case "REAL-TIME":
 			err = manager.CleanUpExpiredUsers(ctx)
 			if err != nil {
 				logger.Log.Errorf("Error sending response: %v", err)
@@ -117,9 +124,8 @@ func RedisHandleConnection(conn net.Conn) {
 			}
 			response = fmt.Sprintf("%d\n", count)
 			logger.Log.Infof("Current Real-Time User Count: %d\n", count)
-
 		default:
-			response = "Unknown command. Available commands: REAL-TIME, PING, HELLO, TIME, EXIT\n"
+			response = "Unknown command. Available commands: ADDUSER, REAL-TIME, PING, HELLO, TIME, EXIT\n"
 		}
 
 		// 6. Send the response to the client.

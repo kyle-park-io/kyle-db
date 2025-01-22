@@ -18,13 +18,13 @@ func main() {
 	config.SetEnv(env)
 	client.Init()
 
-	port := viper.GetString("port.server")
+	port := viper.GetString("port.server." + env)
 	if port == "" {
-		logger.Log.Fatalln("Check env: port.server")
+		logger.Log.Fatalln("Check env: port.server : ", env)
 	}
 
 	// 1. Start the server by listening on a specific port.
-	listener, err := net.Listen("tcp", "localhost:"+port)
+	listener, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		logger.Log.Fatalf("Error starting server: %+v", err)
 	}

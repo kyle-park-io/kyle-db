@@ -15,7 +15,7 @@ var (
 
 func InitRedisClient(port string) *redis.Client {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:" + port,
+		Addr:     ":" + port,
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
@@ -24,7 +24,7 @@ func InitRedisClient(port string) *redis.Client {
 }
 
 func InitTCPClient(port string) net.Conn {
-	conn, err := net.Dial("tcp", "localhost:"+port)
+	conn, err := net.Dial("tcp", ":"+port)
 	if err != nil {
 		panic(err)
 	}
