@@ -11,7 +11,7 @@ ARG GCSFUSE_VERSION=v0.41.6
 # RUN apt-get -qq update && \
 #     apt-get install -yqq upx
 
-COPY redis/src /build
+COPY src /build
 COPY scripts /build/scripts
 
 WORKDIR /build
