@@ -13,8 +13,8 @@ func SetEnv(env string) {
 		os.Setenv("ROOT_PATH", "/app")
 		viper.Set("ROOT_PATH", "/app")
 	} else {
-		os.Setenv("ROOT_PATH", "/home/kyle/code/redis/redis/src")
-		viper.Set("ROOT_PATH", "/home/kyle/code/redis/redis/src")
+		os.Setenv("ROOT_PATH", "/home/kyle/code/kyle-db/db/redis/src")
+		viper.Set("ROOT_PATH", "/home/kyle/code/kyle-db/db/redis/src")
 	}
 
 	os.Setenv("LOG_PATH", viper.GetString("ROOT_PATH")+"/logs")

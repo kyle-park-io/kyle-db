@@ -58,7 +58,7 @@ func RedisHandleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	// redis manager
-	manager := realtime.NewUserManager2(client.RedisClient, "active_users2", 5)
+	manager := realtime.NewUserManager2(client.RedisClient, "active_users2", 30)
 	// context
 	ctx := context.Background()
 

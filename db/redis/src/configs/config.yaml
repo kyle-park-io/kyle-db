@@ -4,6 +4,6 @@ app:
 
 port:
   server:
-    dev: 3004
+    dev: 3005
     prod: 8080
   redis: 6379
