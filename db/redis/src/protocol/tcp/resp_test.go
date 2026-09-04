@@ -9,6 +9,7 @@ import (
 
 // go test -v -run TestSendCommand
 func TestSendCommand(t *testing.T) {
+	skipUnlessManual(t)
 
 	// Init config
 	config.SetEnv("dev")

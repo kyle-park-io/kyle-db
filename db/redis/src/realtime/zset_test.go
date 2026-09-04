@@ -10,6 +10,7 @@ import (
 
 // go test -v -run TestSimulateUserAction2
 func TestSimulateUserAction2(t *testing.T) {
+	skipUnlessManual(t)
 	// Initialize Redis client
 	rdb := client.InitRedisClient("6379")
 	defer rdb.Conn().Close()

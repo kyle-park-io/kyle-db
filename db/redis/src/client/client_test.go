@@ -1,6 +1,7 @@
 package client
 
 import (
+	"os"
 	"testing"
 
 	"kyle-redis/internal/config"
@@ -10,6 +11,7 @@ import (
 
 // go test -v -run TestInitRedisClient
 func TestInitRedisClient(t *testing.T) {
+	skipUnlessManual(t)
 
 	config.SetEnv("dev")
 
@@ -24,6 +26,7 @@ func TestInitRedisClient(t *testing.T) {
 
 // go test -v -run TestInitTCPClient
 func TestInitTCPClient(t *testing.T) {
+	skipUnlessManual(t)
 
 	config.SetEnv("dev")
 
@@ -34,4 +37,15 @@ func TestInitTCPClient(t *testing.T) {
 
 	client := InitTCPClient(port)
 	t.Logf("client: %+v", client)
+}
+
+// These are hand-run experiments, not checks: they need a Redis on the
+// default port and assert nothing. `go test ./...` ran them and failed on a
+// config file that only exists inside the image. Set RUN_MANUAL_TESTS=1 to
+// drive them by hand.
+func skipUnlessManual(t *testing.T) {
+	t.Helper()
+	if os.Getenv("RUN_MANUAL_TESTS") == "" {
+		t.Skip("hand-run experiment; set RUN_MANUAL_TESTS=1")
+	}
 }

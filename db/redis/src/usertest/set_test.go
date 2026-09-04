@@ -16,6 +16,7 @@ import (
 
 // go test -v -run TestHandleClientConnection
 func TestHandleClientConnection(t *testing.T) {
+	skipUnlessManual(t)
 
 	env := "dev"
 	// config
@@ -71,4 +72,15 @@ func simulateClientConnection() {
 	logger.Log.Infof("Response: %s", response)
 
 	os.Exit(1)
+}
+
+// These are hand-run experiments, not checks: they need a Redis on the
+// default port, several of them loop forever on purpose, and one asserts
+// nothing at all. `go test ./...` ran them and never returned. Set
+// RUN_MANUAL_TESTS=1 to drive them by hand.
+func skipUnlessManual(t *testing.T) {
+	t.Helper()
+	if os.Getenv("RUN_MANUAL_TESTS") == "" {
+		t.Skip("hand-run experiment; set RUN_MANUAL_TESTS=1")
+	}
 }

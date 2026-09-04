@@ -3,6 +3,7 @@ package realtime
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 
 // go test -v -run TestTTL
 func TestTTL(t *testing.T) {
+	skipUnlessManual(t)
 	// Initialize Redis client
 	rdb := client.InitRedisClient("6379")
 	defer rdb.Conn().Close()
@@ -42,6 +44,7 @@ func TestTTL(t *testing.T) {
 
 // go test -v -run TestSimulateUserAction
 func TestSimulateUserAction(t *testing.T) {
+	skipUnlessManual(t)
 	// Initialize Redis client
 	rdb := client.InitRedisClient("6379")
 	defer rdb.Conn().Close()
@@ -108,4 +111,15 @@ func simulateUserLeave(ctx context.Context, userManager *UserManager) {
 // Generate a random user ID for simulation
 func randomUserID() int {
 	return time.Now().Second() % 10 // For simplicity, user IDs from 0 to 9
+}
+
+// These are hand-run experiments, not checks: they need a Redis on the
+// default port, several of them loop forever on purpose, and one asserts
+// nothing at all. `go test ./...` ran them and never returned. Set
+// RUN_MANUAL_TESTS=1 to drive them by hand.
+func skipUnlessManual(t *testing.T) {
+	t.Helper()
+	if os.Getenv("RUN_MANUAL_TESTS") == "" {
+		t.Skip("hand-run experiment; set RUN_MANUAL_TESTS=1")
+	}
 }

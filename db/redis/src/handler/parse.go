@@ -5,13 +5,22 @@ import (
 	"strings"
 )
 
-func parseMessage(message string) (command, addr string, err error) {
-	parts := strings.Fields(message)
-	if len(parts) == 1 {
-		return parts[0], "", nil
-	} else if len(parts) == 2 {
-		return parts[0], parts[1], nil
-	} else {
-		return "", "", fmt.Errorf("invalid message format")
+// parseMessage splits a command line into its verb and the rest of the line.
+//
+// The rest is returned whole, not split into fields: ADDUSER's argument is a
+// JSON object, and the previous version of this function rejected any line
+// with more than two space-separated parts. It also rejected a bare verb
+// followed by nothing but spaces, which is how REAL-TIME arrives from some
+// clients.
+func parseMessage(message string) (command, arg string, err error) {
+	line := strings.TrimSpace(message)
+	if line == "" {
+		return "", "", fmt.Errorf("empty command")
 	}
+
+	verb, rest, found := strings.Cut(line, " ")
+	if !found {
+		return verb, "", nil
+	}
+	return verb, strings.TrimSpace(rest), nil
 }

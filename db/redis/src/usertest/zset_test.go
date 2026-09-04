@@ -3,7 +3,6 @@ package usertest
 import (
 	"bufio"
 	"net"
-	"os"
 	"testing"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 
 // go test -v -run TestHandleClientConnection2
 func TestHandleClientConnection2(t *testing.T) {
+	skipUnlessManual(t)
 
 	env := "dev"
 	// config
@@ -74,6 +74,4 @@ func simulateClientConnection2() {
 
 		time.Sleep(2 * time.Second)
 	}
-
-	os.Exit(1)
 }
