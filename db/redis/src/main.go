@@ -26,7 +26,12 @@ func main() {
 	// InitLogger's own `defer Sync()` fired before anything was logged; the
 	// flush belongs to whoever outlives the logger, which is main.
 	defer logger.Sync()
-	client.Init()
+
+	// Blocks until Redis answers. The sidecar is usually a second or two
+	// behind this container on a cold start.
+	if err := client.Init(); err != nil {
+		logger.Log.Fatalw("cannot reach redis", "err", err)
+	}
 
 	port := viper.GetString("port.server." + env)
 	if port == "" {
