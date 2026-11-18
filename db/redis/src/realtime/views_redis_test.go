@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -80,11 +81,69 @@ func TestTwoTabsAtOnceCountOnce(t *testing.T) {
 }
 
 func TestAnExpiredMarkerCountsAgain(t *testing.T) {
-	s, _, ctx := views(t, 300*time.Millisecond)
+	s, client, ctx := views(t, 300*time.Millisecond)
 	view(t, s, ctx, "a", "v1")
-	time.Sleep(400 * time.Millisecond)
+	// Wait for Redis to expire the marker rather than for a fixed 400ms:
+	// Redis expires by the wall clock, and WSL moved it back 2.8s twice in
+	// one minute on the desktop (2026-11-19), so a fixed sleep sometimes
+	// woke before the marker was gone.
+	waitUntil(t, 8*time.Second, func() bool {
+		n, err := client.Exists(ctx, ViewsSeenPrefix+"a:v1").Result()
+		return err == nil && n == 0
+	})
 	if got := view(t, s, ctx, "a", "v1"); got != 2 {
 		t.Errorf("view after the window answered %d, want 2", got)
+	}
+}
+
+// waitUntil polls ok every 50ms and fails the test if it is still false
+// after limit.
+func waitUntil(t *testing.T, limit time.Duration, ok func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(limit)
+	for !ok() {
+		if time.Now().After(deadline) {
+			t.Fatalf("still not true after %v", limit)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// roundTrips counts commands and pipelines sent to Redis.
+type roundTrips struct{ n atomic.Int64 }
+
+func (h *roundTrips) DialHook(next redis.DialHook) redis.DialHook { return next }
+
+func (h *roundTrips) ProcessHook(next redis.ProcessHook) redis.ProcessHook {
+	return func(ctx context.Context, cmd redis.Cmder) error {
+		h.n.Add(1)
+		return next(ctx, cmd)
+	}
+}
+
+func (h *roundTrips) ProcessPipelineHook(next redis.ProcessPipelineHook) redis.ProcessPipelineHook {
+	return func(ctx context.Context, cmds []redis.Cmder) error {
+		h.n.Add(1)
+		return next(ctx, cmds)
+	}
+}
+
+// A view used to be SET NX and then HINCRBY (or HGET): two round trips, and
+// a failure between them left the marker without the count, so that reader
+// went uncounted for a day. One script makes it one atomic step.
+func TestAViewIsOneRoundTrip(t *testing.T) {
+	s, client, ctx := views(t, 24*time.Hour)
+	h := &roundTrips{}
+	client.AddHook(h)
+
+	if got := view(t, s, ctx, "a", "v1"); got != 1 {
+		t.Fatalf("first view answered %d, want 1", got)
+	}
+	if got := view(t, s, ctx, "a", "v1"); got != 1 {
+		t.Fatalf("repeat view answered %d, want 1", got)
+	}
+	if got := h.n.Load(); got != 2 {
+		t.Errorf("two views took %d round trips to Redis, want 2", got)
 	}
 }
 

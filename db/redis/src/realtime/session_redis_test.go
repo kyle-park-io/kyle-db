@@ -95,14 +95,25 @@ func TestASessionExpiresWhenItStopsRefreshing(t *testing.T) {
 		t.Fatalf("count = %d immediately after touch, want 1", got.Count)
 	}
 
-	time.Sleep(2100 * time.Millisecond)
-
-	got, err := s.Snapshot(ctx)
-	if err != nil {
-		t.Fatal(err)
+	// Expiry is judged by the wall clock in whole seconds. A fixed 2.1s sleep
+	// failed about 1 run in 20 on the desktop, where WSL moved the wall clock
+	// back 2.8s twice in one minute (2026-11-19), so wait for the expiry with
+	// a limit well past the TTL instead.
+	var got Snapshot
+	deadline := time.Now().Add(8 * time.Second)
+	for {
+		var err error
+		got, err = s.Snapshot(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Count == 0 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 	if got.Count != 0 {
-		t.Errorf("count = %d after the TTL passed, want 0", got.Count)
+		t.Errorf("count = %d 8s after a 1s TTL, want 0", got.Count)
 	}
 	if len(got.Countries) != 0 {
 		t.Errorf("an expired session left a breakdown behind: %+v", got.Countries)

@@ -101,24 +101,30 @@ func NewViewStore(client *redis.Client, window time.Duration) *ViewStore {
 	return &ViewStore{client: client, window: window}
 }
 
+// viewScript marks the visitor as counted for the window and adds the view,
+// or, when the mark is already there, reads the total. KEYS: the marker,
+// views:count. ARGV: the slug, the window in milliseconds. Redis runs a
+// script as one step, so a view is never half done: before this it was SET
+// NX and then HINCRBY, and a failure between the two left the marker without
+// the count, so that reader went uncounted for a day.
+const viewScript = `
+if redis.call('SET', KEYS[1], '1', 'NX', 'PX', ARGV[2]) then
+  return redis.call('HINCRBY', KEYS[2], ARGV[1], 1)
+end
+return tonumber(redis.call('HGET', KEYS[2], ARGV[1]) or '0')
+`
+
 // View counts one read of slug by visitor id, unless that visitor was
 // already counted for it inside the window, and returns the total either
 // way. SET NX is what makes two tabs opened at once count once: only one of
-// them creates the marker.
+// them creates the marker. EVAL rather than EVALSHA so it is always one
+// round trip; the script is a few hundred bytes.
 func (s *ViewStore) View(ctx context.Context, slug, id string) (int64, error) {
 	marker := ViewsSeenPrefix + slug + ":" + id
-	fresh, err := s.client.SetNX(ctx, marker, 1, s.window).Result()
-	if err != nil {
-		return 0, err
-	}
-	if fresh {
-		return s.client.HIncrBy(ctx, ViewsCountKey, slug, 1).Result()
-	}
-	n, err := s.client.HGet(ctx, ViewsCountKey, slug).Int64()
-	if errors.Is(err, redis.Nil) {
-		return 0, nil
-	}
-	return n, err
+	return s.client.Eval(ctx, viewScript,
+		[]string{marker, ViewsCountKey},
+		slug, s.window.Milliseconds(),
+	).Int64()
 }
 
 // Counts returns the total for each slug; a slug nobody has read is 0.
