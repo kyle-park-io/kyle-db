@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -197,5 +198,40 @@ func TestProtocolReportsNobodyAsAnEmptySnapshot(t *testing.T) {
 	reply := c.say("REAL-TIME")
 	if reply != `{"count":0,"countries":[],"pages":[]}` {
 		t.Errorf("an empty site answered %q", reply)
+	}
+}
+
+func TestViewIsCountedOncePerVisitor(t *testing.T) {
+	c := serve(t)
+
+	for i := 0; i < 2; i++ {
+		if got := c.say(`VIEW {"slug":"rfq-deep-dive","id":"v1"}`); got != `{"slug":"rfq-deep-dive","views":1}` {
+			t.Fatalf("VIEW %d from v1 answered %q", i, got)
+		}
+	}
+	if got := c.say(`VIEW {"slug":"rfq-deep-dive","id":"v2"}`); got != `{"slug":"rfq-deep-dive","views":2}` {
+		t.Errorf("VIEW from v2 answered %q", got)
+	}
+	if got := c.say("VIEWS rfq-deep-dive,chain-communicator-v2"); got != `{"chain-communicator-v2":0,"rfq-deep-dive":2}` {
+		t.Errorf("VIEWS answered %q", got)
+	}
+}
+
+func TestBadViewCommandsAnswerErr(t *testing.T) {
+	c := serve(t)
+
+	for _, line := range []string{
+		"VIEW",
+		"VIEW nonsense",
+		`VIEW {"slug":"../x","id":"v1"}`,
+		"VIEWS",
+		"VIEWS a,,b",
+	} {
+		if got := c.say("%s", line); !strings.HasPrefix(got, "ERR ") {
+			t.Errorf("%q answered %q, want an ERR line", line, got)
+		}
+	}
+	if got := c.say("PING"); got != "PONG" {
+		t.Errorf("after the bad commands PING answered %q", got)
 	}
 }

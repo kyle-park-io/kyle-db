@@ -22,6 +22,10 @@ import (
 // recovered every half minute.
 const sessionTTL = 30 * time.Second
 
+// How long one visitor reading one post counts as a single view: one view
+// per visitor per post per day (the blog view-count spec, 2026-11-18).
+const viewWindow = 24 * time.Hour
+
 func BasicHandleConnection(conn net.Conn) {
 	defer conn.Close()
 	reader := bufio.NewReader(conn)
@@ -54,6 +58,7 @@ func RedisHandleConnection(conn net.Conn) {
 	defer conn.Close()
 	peer := conn.RemoteAddr().String()
 	store := realtime.NewSessionStore(client.RedisClient, sessionTTL)
+	views := realtime.NewViewStore(client.RedisClient, viewWindow)
 	ctx := context.Background()
 	reader := bufio.NewReader(conn)
 	for {
@@ -75,7 +80,7 @@ func RedisHandleConnection(conn net.Conn) {
 			}
 			continue
 		}
-		response, keepGoing := dispatch(ctx, store, command, arg, peer)
+		response, keepGoing := dispatch(ctx, store, views, command, arg, peer)
 		if !write(conn, response) {
 			return
 		}
@@ -90,6 +95,7 @@ func RedisHandleConnection(conn net.Conn) {
 func dispatch(
 	ctx context.Context,
 	store *realtime.SessionStore,
+	views *realtime.ViewStore,
 	command, arg, peer string,
 ) (response string, keepGoing bool) {
 	switch command {
@@ -142,9 +148,49 @@ func dispatch(
 		}
 		logCountChange(snapshot)
 		return string(blob) + "\n", true
+	case "VIEW":
+		// One read of one blog post. The proxy has already checked that the
+		// post is listed and who the visitor is; see
+		// ingress-reverse-proxy/redis/views.go. Good views are not logged:
+		// there is one per reader per post.
+		req, err := realtime.ParseView(arg)
+		if err != nil {
+			logger.Log.Warnw("bad VIEW", "peer", peer, "arg", arg, "err", err)
+			return "ERR " + err.Error() + "\n", true
+		}
+		n, err := views.View(ctx, req.Slug, req.ID)
+		if err != nil {
+			logger.Log.Errorw("could not record view", "slug", req.Slug, "err", err)
+			return "ERR " + err.Error() + "\n", true
+		}
+		return reply(struct {
+			Slug  string `json:"slug"`
+			Views int64  `json:"views"`
+		}{req.Slug, n})
+	case "VIEWS":
+		slugs, err := realtime.ParseSlugs(arg)
+		if err != nil {
+			logger.Log.Warnw("bad VIEWS", "peer", peer, "arg", arg, "err", err)
+			return "ERR " + err.Error() + "\n", true
+		}
+		counts, err := views.Counts(ctx, slugs)
+		if err != nil {
+			logger.Log.Errorw("could not read views", "err", err)
+			return "ERR " + err.Error() + "\n", true
+		}
+		return reply(counts)
 	default:
-		return "Unknown command. Available commands: ADDUSER, DROPUSER, REAL-TIME, PING, HELLO, TIME, EXIT\n", true
+		return "Unknown command. Available commands: ADDUSER, DROPUSER, REAL-TIME, VIEW, VIEWS, PING, HELLO, TIME, EXIT\n", true
 	}
+}
+
+// reply encodes one JSON answer line.
+func reply(v any) (string, bool) {
+	blob, err := json.Marshal(v)
+	if err != nil {
+		return "ERR " + err.Error() + "\n", true
+	}
+	return string(blob) + "\n", true
 }
 
 // write returns false when the connection is gone.
