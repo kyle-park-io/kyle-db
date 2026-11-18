@@ -16,20 +16,21 @@ CONTEXT_PATH=$SCRIPT_DIR
 
 set -e
 
-# delete existing image
-# untag
-gcloud artifacts docker tags delete $LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$TAG --quiet || true
-gcloud artifacts docker tags delete $LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$TAG_LATEST --quiet || true
-# delete
-# --filter="tags:$TAG" --format="get(DIGEST)" --limit=1
-DIGEST=$(gcloud artifacts docker images list $LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY --filter="PACKAGE: $IMAGE" --format="get(DIGEST)" --limit=1)
-gcloud artifacts docker images delete $LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE@$DIGEST --quiet || true
+# The previous image is not deleted here. This used to untag the version
+# and `latest` and then delete the newest digest in the package. On
+# 2026-11-18 that digest was the attestation manifest inside 0.0.3, the image
+# production was running, so the step would have broken pulling the live
+# image and left nothing to roll back to. Old versions are aged out by the
+# repository's cleanup policy instead (TAGGED older than 30 days, keeping
+# the newest 12), the same as kyle-server's push scripts.
 
-# IMAGE_TAG=me-west1-docker.pkg.dev/kyle-server-402706/kyle-registry/ingress-reverse-proxy-app-server:0.0.1
 IMAGE_TAG=$LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$TAG
-# --no-cache
-docker buildx build --no-cache --build-arg=PROGRAM_VER=0.0.1 --load -t $IMAGE_TAG -f $DOCKERFILE_PATH $CONTEXT_PATH
-# docker buildx build --no-cache --platform linux/amd64 --build-arg=PROGRAM_VER=0.0.1 --push -t $IMAGE_TAG -f $DOCKERFILE_PATH $CONTEXT_PATH
+# --provenance=false: by default buildx publishes an OCI index with the image
+# and an attestation manifest, and Artifact Registry lists the children as
+# untagged versions of their own; deleting one breaks `docker pull` of the
+# tagged image. One manifest per release keeps that from being possible.
+# PROGRAM_VER is the version the binary reports; it was fixed at 0.0.1.
+docker buildx build --provenance=false --no-cache --platform linux/amd64 --build-arg=PROGRAM_VER=$TAG --load -t $IMAGE_TAG -f $DOCKERFILE_PATH $CONTEXT_PATH
 docker push $IMAGE_TAG
 
 IMAGE_TAG_LATEST=$LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$TAG_LATEST
