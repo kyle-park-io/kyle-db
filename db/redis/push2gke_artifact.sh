@@ -4,7 +4,9 @@ PROJECT_ID=kyle-server-402706
 REPOSITORY=kyle-registry
 LOCATION=me-west1
 IMAGE=redis-tcp-app-server
-TAG=0.0.1
+# The version is an argument: this read TAG=0.0.1 while production ran
+# 0.0.3 (2026-11-18), so a release meant editing the script first.
+TAG=${1:?usage: push2gke_artifact.sh <version>}
 TAG_LATEST=latest
 
 # dir
